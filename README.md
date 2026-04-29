@@ -49,10 +49,10 @@ OUTPUT lab_professors
 
 ## Installing In Hermes
 
-The repo root is the plugin directory. If you are using Hermes from WSL and this repo is on Windows at `C:\Users\vival\Desktop\AQL`, the WSL path is:
+The repo root is the plugin directory. If you are using Hermes from WSL and this repo is on Windows at `C:\Users\<user>\Desktop\AQL`, the WSL path is:
 
 ```bash
-/mnt/c/Users/vival/Desktop/AQL
+/mnt/c/Users/<user>/Desktop/AQL
 ```
 
 ### User Plugin Install
@@ -61,7 +61,7 @@ This is the simplest install path. It makes the plugin available to every Hermes
 
 ```bash
 mkdir -p ~/.hermes/plugins
-ln -sfn /mnt/c/Users/vival/Desktop/AQL ~/.hermes/plugins/aql-rubicon
+ln -sfn /mnt/c/Users/<user>/Desktop/AQL ~/.hermes/plugins/aql-rubicon
 ~/.local/bin/hermes plugins enable aql-rubicon
 ~/.local/bin/hermes plugins list
 ```
@@ -86,7 +86,7 @@ Use this if you only want the plugin available in one project. Project plugins a
 
 ```bash
 mkdir -p .hermes/plugins
-ln -sfn /mnt/c/Users/vival/Desktop/AQL .hermes/plugins/aql-rubicon
+ln -sfn /mnt/c/Users/<user>/Desktop/AQL .hermes/plugins/aql-rubicon
 HERMES_ENABLE_PROJECT_PLUGINS=1 ~/.local/bin/hermes plugins enable aql-rubicon
 HERMES_ENABLE_PROJECT_PLUGINS=1 ~/.local/bin/hermes
 ```
