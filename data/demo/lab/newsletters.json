@@ -1,0 +1,21 @@
+[
+  {
+    "newsletter_id": "n001",
+    "title": "Systems Lab Weekly",
+    "subscriber": "user@example.edu",
+    "topic": "distributed systems"
+  },
+  {
+    "newsletter_id": "n002",
+    "title": "Programming Languages Digest",
+    "subscriber": "user@example.edu",
+    "topic": "programming languages"
+  },
+  {
+    "newsletter_id": "n003",
+    "title": "Campus Events",
+    "subscriber": "guest@example.edu",
+    "topic": "events"
+  }
+]
+

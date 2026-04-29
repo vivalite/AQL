@@ -1,0 +1,16 @@
+[project]
+name = "aql-rubicon-hermes-plugin"
+version = "0.1.0"
+description = "Hermes Agent plugin implementing a RUBICON-style Agentic Query Language prototype."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"
+

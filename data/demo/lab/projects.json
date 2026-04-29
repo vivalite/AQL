@@ -1,0 +1,24 @@
+[
+  {
+    "project_id": "r001",
+    "building_id": "b001",
+    "project_name": "Transparent Query Planning",
+    "status": "active",
+    "summary": "A project on explicit query plans for multi-source enterprise data."
+  },
+  {
+    "project_id": "r002",
+    "building_id": "b003",
+    "project_name": "Auditable Agent Workflows",
+    "status": "active",
+    "summary": "A project on visible intermediate tables and deterministic joins."
+  },
+  {
+    "project_id": "r003",
+    "building_id": "b002",
+    "project_name": "Spatial Safety Analytics",
+    "status": "paused",
+    "summary": "A project analyzing campus movement and facility safety."
+  }
+]
+

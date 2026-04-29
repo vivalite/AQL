@@ -1,0 +1,27 @@
+[
+  {
+    "person_id": "p001",
+    "lab_role": "Research Lab Professor",
+    "research_area": "programming languages",
+    "public_profile": "Ada Lovelace leads the analytical systems group."
+  },
+  {
+    "person_id": "p002",
+    "lab_role": "Research Lab Professor",
+    "research_area": "compilers",
+    "public_profile": "Grace Hopper works on programming languages and developer tools."
+  },
+  {
+    "person_id": "p004",
+    "lab_role": "Research Lab Affiliate",
+    "research_area": "formal methods",
+    "public_profile": "Alan Turing collaborates on symbolic reasoning projects."
+  },
+  {
+    "person_id": "p005",
+    "lab_role": "Research Lab Professor",
+    "research_area": "distributed systems",
+    "public_profile": "Barbara Liskov works on distributed systems and verification."
+  }
+]
+

@@ -1,0 +1,11 @@
+name: aql-rubicon
+version: 0.1.0
+description: "RUBICON-style Agentic Query Language tools for explicit multi-source data retrieval, joins, and visible intermediate tables."
+author: "vivalite"
+provides_tools:
+  - aql_execute
+  - aql_schema
+  - aql_register_source
+skills:
+  - aql-rubicon
+
