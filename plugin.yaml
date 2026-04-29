@@ -6,6 +6,7 @@ provides_tools:
   - aql_execute
   - aql_schema
   - aql_register_source
+  - aql_explain
+  - aql_sources
 skills:
   - aql-rubicon
-

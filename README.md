@@ -9,6 +9,8 @@ The plugin exposes explicit, auditable query operations over source wrappers ins
 - `aql_schema`: inspect registered sources, tables, and columns.
 - `aql_execute`: run AQL commands or semicolon-separated AQL scripts.
 - `aql_register_source`: add SQLite, CSV directory, JSON directory, or Wikipedia sources.
+- `aql_explain`: parse and resolve AQL without executing it.
+- `aql_sources`: list, show, status-check, enable, disable, or delete sources.
 
 ## Supported AQL
 
@@ -19,6 +21,8 @@ The plugin exposes explicit, auditable query operations over source wrappers ins
 FIND <column(s)> FROM <table> WHERE <natural language predicate>
 FIND count(*) FROM <table> WHERE <predicate>
 FIND ... JOIN FIND ...
+FIND ... JOIN FIND ... ON left_col = right_col
+EXPLAIN <query>
 SAVE (<query>) AS <new_table>
 OUTPUT <table>
 DELETE <table>
@@ -38,7 +42,7 @@ Try:
 
 ```text
 FIND person_id, full_name FROM demo_university.faculty WHERE department = "Computer Science"
-FIND person_id, full_name FROM demo_university.faculty WHERE title contains Professor JOIN FIND person_id, lab_role FROM demo_lab.people WHERE lab_role contains Professor
+FIND person_id, full_name FROM demo_university.faculty WHERE title contains Professor JOIN FIND person_id, lab_role FROM demo_lab.people WHERE lab_role contains Professor ON person_id = person_id
 SAVE (FIND person_id, lab_role FROM demo_lab.people WHERE lab_role contains Professor) AS lab_professors
 OUTPUT lab_professors
 ```
@@ -74,7 +78,7 @@ Inside Hermes, verify the plugin is loaded:
 /plugins
 ```
 
-You should see `aql-rubicon` with the three tools `aql_execute`, `aql_schema`, and `aql_register_source`.
+You should see `aql-rubicon` with the tools `aql_execute`, `aql_schema`, `aql_register_source`, `aql_explain`, and `aql_sources`.
 
 ### Project-Local Plugin Install
 
@@ -148,10 +152,41 @@ This joins the SQLite university demo source with the JSON research lab demo sou
 
 ```text
 Use aql_execute with:
+FIND person_id, full_name FROM demo_university.faculty WHERE title = "Professor" JOIN FIND person_id, lab_role FROM demo_lab.people WHERE lab_role = "Research Lab Professor" ON person_id = person_id
+```
+
+The trace will include an `explicit_join` step so you can see which columns were used and how many rows were joined.
+
+If `ON` is omitted, AQL falls back to a natural join over same-named columns:
+
+```text
+Use aql_execute with:
 FIND person_id, full_name FROM demo_university.faculty WHERE title = "Professor" JOIN FIND person_id, lab_role FROM demo_lab.people WHERE lab_role = "Research Lab Professor"
 ```
 
-The trace will include a `natural_join` step so you can see which columns were used and how many rows were joined.
+Use explicit joins when source columns have different names:
+
+```text
+FIND person_id, full_name FROM source_a.people JOIN FIND researcher_id, lab_role FROM source_b.roster ON person_id = researcher_id
+```
+
+If the right side has a duplicate non-join column, the result prefixes it with the right table name, such as `roster.full_name`.
+
+### 3.1 Explain A Query Without Running It
+
+```text
+Use aql_explain with:
+FIND person_id FROM demo_university.faculty WHERE department = "Computer Science" JOIN FIND person_id FROM demo_lab.people WHERE lab_role contains Professor ON person_id = person_id
+```
+
+You can also use AQL syntax directly:
+
+```text
+Use aql_execute with:
+EXPLAIN FIND person_id FROM demo_university.faculty WHERE department = "Computer Science"
+```
+
+Explain results include resolved sources, table names, selected columns, predicate plans, join plans, and whether SQLite pushdown is available.
 
 ### 4. Save And Reuse An Intermediate Table
 
@@ -199,6 +234,8 @@ Supported aggregates:
 - `min(column)`
 - `max(column)`
 
+For SQLite sources, supported projections, predicates, limits, and aggregates are pushed into SQL. The trace includes `pushdown: true` and the SQL statement used.
+
 ### 6. Register Your Own Sources
 
 SQLite:
@@ -243,6 +280,18 @@ Use aql_execute with:
 FIND title, url, snippet FROM wiki.pages WHERE programming languages
 ```
 
+Manage existing sources:
+
+```text
+Use aql_sources with action list.
+Use aql_sources with action status and name demo_university.
+Use aql_sources with action disable and name demo_lab.
+Use aql_sources with action enable and name demo_lab.
+Use aql_sources with action delete and name my_old_source.
+```
+
+Disabled sources remain visible in `aql_sources list`, but AQL ignores them during query table resolution.
+
 ### 7. Predicate Style
 
 Predicates are deterministic and intentionally simple. Prefer explicit filters:
@@ -253,12 +302,17 @@ title contains Professor
 opened_year >= 2000
 promotion_date after 2020-01-01
 status != "closed"
+department IN ("Computer Science", Mathematics)
+opened_year BETWEEN 1980 AND 2000
+closed_at IS NULL
+closed_at IS NOT NULL
 ```
 
-Multiple clauses can be combined with `AND`:
+Clauses can be combined with `AND`, `OR`, and parentheses:
 
 ```text
 department = "Computer Science" AND title contains Professor
+(department = "Computer Science" OR department = Mathematics) AND title contains Professor
 ```
 
 If the predicate is plain text, the wrapper falls back to keyword matching across row values.

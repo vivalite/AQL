@@ -32,8 +32,25 @@ class FindQuery:
 
 
 @dataclass(frozen=True)
+class JoinCondition:
+    left: str
+    right: str
+
+
+@dataclass(frozen=True)
+class JoinStep:
+    query: FindQuery
+    conditions: tuple[JoinCondition, ...] = ()
+
+
+@dataclass(frozen=True)
 class JoinQuery:
-    parts: tuple[FindQuery, ...]
+    first: FindQuery
+    steps: tuple[JoinStep, ...]
+
+    @property
+    def parts(self) -> tuple[FindQuery, ...]:
+        return (self.first,) + tuple(step.query for step in self.steps)
 
 
 @dataclass(frozen=True)
@@ -57,7 +74,12 @@ class SchemaCommand:
     target: str | None = None
 
 
-Command = FindQuery | JoinQuery | SaveCommand | OutputCommand | DeleteCommand | SchemaCommand
+@dataclass(frozen=True)
+class ExplainCommand:
+    command: FindQuery | JoinQuery | SaveCommand | OutputCommand | DeleteCommand | SchemaCommand
+
+
+Command = FindQuery | JoinQuery | SaveCommand | OutputCommand | DeleteCommand | SchemaCommand | ExplainCommand
 
 
 @dataclass(frozen=True)
@@ -66,4 +88,4 @@ class SourceConfig:
     kind: Literal["sqlite", "csv_dir", "json_dir", "wikipedia"]
     path: str | None = None
     options: dict | None = None
-
+    enabled: bool = True

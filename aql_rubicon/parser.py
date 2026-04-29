@@ -8,8 +8,11 @@ from typing import Iterable
 from .ast import (
     Command,
     DeleteCommand,
+    ExplainCommand,
     FindQuery,
+    JoinCondition,
     JoinQuery,
+    JoinStep,
     OutputCommand,
     SaveCommand,
     SchemaCommand,
@@ -32,6 +35,10 @@ _AGG_RE = re.compile(
     re.I,
 )
 _ALIAS_RE = re.compile(r"^(?P<column>[A-Za-z_][A-Za-z0-9_.-]*|\*)\s+AS\s+(?P<alias>[A-Za-z_][A-Za-z0-9_]*)$", re.I)
+_JOIN_COND_RE = re.compile(
+    r"^(?P<left>[A-Za-z_][A-Za-z0-9_.-]*)\s*=\s*(?P<right>[A-Za-z_][A-Za-z0-9_.-]*)$",
+    re.I,
+)
 
 
 def split_script(script: str) -> list[str]:
@@ -88,6 +95,8 @@ def parse(command: str) -> Command:
         target = text[1:].strip()
         return SchemaCommand(target or None)
     upper = text.upper()
+    if upper.startswith("EXPLAIN "):
+        return ExplainCommand(parse(text.split(None, 1)[1]))
     if upper.startswith("SAVE"):
         return _parse_save(text)
     if upper.startswith("OUTPUT"):
@@ -112,10 +121,14 @@ def _parse_save(text: str) -> SaveCommand:
 
 def _parse_query(text: str) -> FindQuery | JoinQuery:
     parts = _split_join(text)
-    queries = tuple(_parse_find(part) for part in parts)
-    if len(queries) == 1:
-        return queries[0]
-    return JoinQuery(queries)
+    first = _parse_find(parts[0])
+    if len(parts) == 1:
+        return first
+    steps: list[JoinStep] = []
+    for part in parts[1:]:
+        find_text, conditions = _split_join_condition(part)
+        steps.append(JoinStep(query=_parse_find(find_text), conditions=conditions))
+    return JoinQuery(first=first, steps=tuple(steps))
 
 
 def _parse_find(text: str) -> FindQuery:
@@ -196,6 +209,66 @@ def _split_join(text: str) -> list[str]:
     if any(not token for token in tokens):
         raise AQLSyntaxError("JOIN requires a FIND query on both sides")
     return tokens
+
+
+def _split_join_condition(text: str) -> tuple[str, tuple[JoinCondition, ...]]:
+    candidates = _keyword_positions(text, "ON")
+    for pos in reversed(candidates):
+        find_text = text[:pos].strip()
+        condition_text = text[pos + 2 :].strip()
+        if not find_text or not condition_text:
+            continue
+        conditions = _parse_join_conditions(condition_text)
+        if conditions:
+            return find_text, conditions
+    return text, ()
+
+
+def _parse_join_conditions(text: str) -> tuple[JoinCondition, ...]:
+    parts = re.split(r"\s+\bAND\b\s+", text, flags=re.I)
+    conditions: list[JoinCondition] = []
+    for part in parts:
+        match = _JOIN_COND_RE.match(part.strip())
+        if not match:
+            return ()
+        conditions.append(JoinCondition(left=match.group("left"), right=match.group("right")))
+    return tuple(conditions)
+
+
+def _keyword_positions(text: str, keyword: str) -> list[int]:
+    positions: list[int] = []
+    quote: str | None = None
+    depth = 0
+    i = 0
+    upper_keyword = keyword.upper()
+    while i < len(text):
+        char = text[i]
+        if quote:
+            if char == quote:
+                quote = None
+            i += 1
+            continue
+        if char in {"'", '"'}:
+            quote = char
+            i += 1
+            continue
+        if char == "(":
+            depth += 1
+            i += 1
+            continue
+        if char == ")":
+            depth = max(0, depth - 1)
+            i += 1
+            continue
+        if depth == 0 and text[i : i + len(keyword)].upper() == upper_keyword:
+            before = text[i - 1] if i > 0 else " "
+            after = text[i + len(keyword)] if i + len(keyword) < len(text) else " "
+            if before.isspace() and after.isspace():
+                positions.append(i)
+                i += len(keyword)
+                continue
+        i += 1
+    return positions
 
 
 def _split_csv(text: str) -> list[str]:

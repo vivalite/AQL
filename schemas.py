@@ -91,3 +91,56 @@ AQL_REGISTER_SOURCE = {
     },
 }
 
+
+AQL_EXPLAIN = {
+    "name": "aql_explain",
+    "description": "Parse and resolve AQL without executing it. Returns source/table, predicate, join, and pushdown plans.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "query": {
+                "type": "string",
+                "description": "AQL command or semicolon-separated script to explain.",
+            },
+            "workspace": {
+                "type": "string",
+                "description": "Workspace name used for source configs and saved tables.",
+                "default": "default",
+            },
+            "limit": {
+                "type": "integer",
+                "description": "Maximum row limit that would be applied during execution.",
+                "default": 50,
+                "minimum": 1,
+                "maximum": 500,
+            },
+        },
+        "required": ["query"],
+    },
+}
+
+
+AQL_SOURCES = {
+    "name": "aql_sources",
+    "description": "Manage AQL sources: list, show, status, enable, disable, or delete.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "action": {
+                "type": "string",
+                "enum": ["list", "show", "status", "enable", "disable", "delete"],
+                "description": "Source management action.",
+                "default": "list",
+            },
+            "name": {
+                "type": "string",
+                "description": "Source name for show/status/enable/disable/delete.",
+            },
+            "workspace": {
+                "type": "string",
+                "description": "Workspace name used for source configs and saved tables.",
+                "default": "default",
+            },
+        },
+    },
+}

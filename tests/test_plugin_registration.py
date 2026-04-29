@@ -30,8 +30,7 @@ def test_plugin_registers_tools_and_skill() -> None:
     ctx = FakeCtx()
     module.register(ctx)
 
-    assert set(ctx.tools) == {"aql_execute", "aql_schema", "aql_register_source"}
+    assert set(ctx.tools) == {"aql_execute", "aql_schema", "aql_register_source", "aql_explain", "aql_sources"}
     assert {payload["toolset"] for payload in ctx.tools.values()} == {"aql"}
     assert "aql-rubicon" in ctx.skills
     assert ctx.skills["aql-rubicon"].exists()
-

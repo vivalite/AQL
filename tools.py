@@ -71,3 +71,37 @@ def aql_register_source(args: dict, **_: Any) -> str:
             "workspace": workspace,
         }
     return _json(payload)
+
+
+def aql_explain(args: dict, **_: Any) -> str:
+    """Explain an AQL command or script without executing it."""
+    query = str(args.get("query") or "").strip()
+    workspace = str(args.get("workspace") or "default").strip() or "default"
+    limit = args.get("limit", 50)
+    if not query:
+        return _json({"ok": False, "errors": ["query is required"]})
+    try:
+        payload = _runtime(workspace).explain_script(query, limit=limit)
+    except Exception as exc:
+        payload = {
+            "ok": False,
+            "errors": [f"{type(exc).__name__}: {exc}"],
+            "workspace": workspace,
+        }
+    return _json(payload)
+
+
+def aql_sources(args: dict, **_: Any) -> str:
+    """Manage registered AQL sources."""
+    workspace = str(args.get("workspace") or "default").strip() or "default"
+    action = str(args.get("action") or "list").strip() or "list"
+    name = args.get("name")
+    try:
+        payload = _runtime(workspace).sources(action, name=None if name is None else str(name).strip())
+    except Exception as exc:
+        payload = {
+            "ok": False,
+            "errors": [f"{type(exc).__name__}: {exc}"],
+            "workspace": workspace,
+        }
+    return _json(payload)

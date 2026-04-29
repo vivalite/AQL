@@ -47,6 +47,7 @@ class WorkspaceState:
                 kind=raw["kind"],
                 path=raw.get("path"),
                 options=raw.get("options") or {},
+                enabled=bool(raw.get("enabled", True)),
             )
         return sources
 
@@ -57,8 +58,34 @@ class WorkspaceState:
             "kind": source.kind,
             "path": source.path,
             "options": source.options or {},
+            "enabled": source.enabled,
         }
         _write_json(self.sources_file, payload)
+
+    def delete_source(self, name: str) -> bool:
+        _validate_name(name, label="source")
+        payload = _read_json(self.sources_file, default={"sources": {}})
+        if name not in payload.get("sources", {}):
+            return False
+        del payload["sources"][name]
+        _write_json(self.sources_file, payload)
+        return True
+
+    def set_source_enabled(self, name: str, enabled: bool) -> SourceConfig:
+        _validate_name(name, label="source")
+        sources = self.list_sources()
+        if name not in sources:
+            raise StateError(f"source not found: {name}")
+        source = sources[name]
+        updated = SourceConfig(
+            name=source.name,
+            kind=source.kind,
+            path=source.path,
+            options=source.options or {},
+            enabled=enabled,
+        )
+        self.save_source(updated)
+        return updated
 
     def list_saved_tables(self) -> list[str]:
         return sorted(path.stem for path in self.tables_dir.glob("*.json"))
@@ -107,16 +134,19 @@ class WorkspaceState:
                     "kind": "sqlite",
                     "path": str(demo_sqlite),
                     "options": {"description": "Bundled university data warehouse demo"},
+                    "enabled": True,
                 },
                 "demo_lab": {
                     "kind": "json_dir",
                     "path": str(demo_lab),
                     "options": {"description": "Bundled research lab website demo"},
+                    "enabled": True,
                 },
                 "wikipedia": {
                     "kind": "wikipedia",
                     "path": None,
                     "options": {"description": "Public MediaWiki search wrapper"},
+                    "enabled": True,
                 },
             }
         }
@@ -160,4 +190,3 @@ def _read_json(path: Path, *, default: Any) -> Any:
 def _write_json(path: Path, payload: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
-

@@ -31,6 +31,18 @@ def register(ctx) -> None:
         schema=schemas.AQL_REGISTER_SOURCE,
         handler=tools.aql_register_source,
     )
+    ctx.register_tool(
+        name="aql_explain",
+        toolset="aql",
+        schema=schemas.AQL_EXPLAIN,
+        handler=tools.aql_explain,
+    )
+    ctx.register_tool(
+        name="aql_sources",
+        toolset="aql",
+        schema=schemas.AQL_SOURCES,
+        handler=tools.aql_sources,
+    )
 
     skills_dir = Path(__file__).parent / "skills"
     skill_md = skills_dir / "aql-rubicon" / "SKILL.md"

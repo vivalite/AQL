@@ -11,8 +11,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable
 
-from .ast import SourceConfig
-from .predicate import extract_keywords, filter_rows
+from .ast import SelectItem, SourceConfig
+from .predicate import compile_sql, extract_keywords, filter_rows
 
 
 class WrapperError(ValueError):
@@ -26,6 +26,7 @@ class TableResult:
     provenance: list[dict[str, Any]] = field(default_factory=list)
     trace: list[dict[str, Any]] = field(default_factory=list)
     truncated: bool = False
+    warnings: list[str] = field(default_factory=list)
 
 
 class SourceWrapper:
@@ -60,6 +61,9 @@ class SourceWrapper:
             ],
             truncated=truncated,
         )
+
+    def query_aggregate(self, table: str, columns: tuple[SelectItem, ...], where: str | None) -> TableResult | None:
+        return None
 
     def _all_rows(self, table: str) -> list[dict[str, Any]]:
         raise NotImplementedError
@@ -96,6 +100,110 @@ class SQLiteWrapper(SourceWrapper):
         with self._connect() as conn:
             rows = conn.execute(f"SELECT * FROM {_quote_identifier(table)}").fetchall()
         return [dict(row) for row in rows]
+
+    def query(self, table: str, columns: list[str], where: str | None, limit: int) -> TableResult:
+        schema = self.schema(table)
+        schema_columns = [column["name"] for column in schema]
+        selected_columns = schema_columns if columns == ["*"] else columns
+        warnings: list[str] = []
+        if not all(_has_column(column, schema_columns) for column in selected_columns):
+            fallback = super().query(table, columns, where, limit)
+            fallback.warnings.append("sqlite pushdown skipped: unknown projected column")
+            fallback.trace.append({"operation": "pushdown", "source": self.config.name, "supported": False})
+            return fallback
+        predicate = compile_sql(where, schema_columns)
+        if not predicate.supported:
+            fallback = super().query(table, columns, where, limit)
+            fallback.warnings.extend(predicate.warnings)
+            fallback.trace.append(
+                {
+                    "operation": "pushdown",
+                    "source": self.config.name,
+                    "supported": False,
+                    "warnings": list(predicate.warnings),
+                }
+            )
+            return fallback
+
+        sql_columns = "*" if columns == ["*"] else ", ".join(_quote_identifier(_resolve_column_name(column, schema_columns)) for column in columns)
+        sql = f"SELECT {sql_columns} FROM {_quote_identifier(table)}"
+        params = list(predicate.params)
+        if where:
+            sql += f" WHERE {predicate.sql}"
+        if limit > 0:
+            sql += " LIMIT ?"
+            params.append(limit + 1)
+        with self._connect() as conn:
+            rows = [dict(row) for row in conn.execute(sql, params).fetchall()]
+        truncated = limit > 0 and len(rows) > limit
+        if truncated:
+            rows = rows[:limit]
+        if columns == ["*"]:
+            output_columns = schema_columns
+        else:
+            output_columns = [_resolve_column_name(column, schema_columns) for column in columns]
+        return TableResult(
+            columns=output_columns,
+            rows=rows,
+            provenance=[{"source": self.config.name, "kind": self.config.kind, "table": table}],
+            trace=[
+                {
+                    "source": self.config.name,
+                    "table": table,
+                    "predicate": where,
+                    "rows_returned": len(rows),
+                    "truncated": truncated,
+                    "pushdown": True,
+                    "sql": sql,
+                }
+            ],
+            truncated=truncated,
+            warnings=warnings,
+        )
+
+    def query_aggregate(self, table: str, columns: tuple[SelectItem, ...], where: str | None) -> TableResult | None:
+        schema = self.schema(table)
+        schema_columns = [column["name"] for column in schema]
+        predicate = compile_sql(where, schema_columns)
+        if not predicate.supported:
+            return None
+        expressions: list[str] = []
+        output_columns: list[str] = []
+        for item in columns:
+            if not item.aggregate:
+                return None
+            if item.column == "*":
+                if item.aggregate != "count":
+                    return None
+                expression = "COUNT(*)"
+            else:
+                if not _has_column(item.column, schema_columns):
+                    return None
+                expression = f"{item.aggregate.upper()}({_quote_identifier(_resolve_column_name(item.column, schema_columns))})"
+            expressions.append(f"{expression} AS {_quote_alias(item.output_name)}")
+            output_columns.append(item.output_name)
+        sql = f"SELECT {', '.join(expressions)} FROM {_quote_identifier(table)}"
+        params = list(predicate.params)
+        if where:
+            sql += f" WHERE {predicate.sql}"
+        with self._connect() as conn:
+            row = dict(conn.execute(sql, params).fetchone())
+        return TableResult(
+            columns=output_columns,
+            rows=[row],
+            provenance=[{"source": self.config.name, "kind": self.config.kind, "table": table}],
+            trace=[
+                {
+                    "source": self.config.name,
+                    "table": table,
+                    "predicate": where,
+                    "rows_returned": 1,
+                    "pushdown": True,
+                    "aggregate_pushdown": True,
+                    "sql": sql,
+                }
+            ],
+        )
 
 
 class CSVDirWrapper(SourceWrapper):
@@ -315,3 +423,20 @@ def _quote_identifier(identifier: str) -> str:
     if not identifier.replace("_", "").isalnum():
         raise WrapperError(f"invalid sqlite identifier: {identifier}")
     return f'"{identifier}"'
+
+
+def _quote_alias(identifier: str) -> str:
+    return '"' + identifier.replace('"', '""') + '"'
+
+
+def _has_column(column: str, columns: list[str]) -> bool:
+    lowered = column.lower()
+    return any(existing.lower() == lowered for existing in columns)
+
+
+def _resolve_column_name(column: str, columns: list[str]) -> str:
+    lowered = column.lower()
+    for existing in columns:
+        if existing.lower() == lowered:
+            return existing
+    return column

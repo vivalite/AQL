@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from aql_rubicon.ast import FindQuery, JoinQuery, SaveCommand, SchemaCommand
+from aql_rubicon.ast import ExplainCommand, FindQuery, JoinQuery, SaveCommand, SchemaCommand
 from aql_rubicon.parser import AQLSyntaxError, parse, split_script
 
 
@@ -21,6 +21,23 @@ def test_parse_join() -> None:
     )
     assert isinstance(command, JoinQuery)
     assert len(command.parts) == 2
+    assert command.steps[0].conditions == ()
+
+
+def test_parse_explicit_join_conditions() -> None:
+    command = parse(
+        "FIND person_id FROM faculty "
+        "JOIN FIND researcher_id FROM lab_people ON person_id = researcher_id"
+    )
+    assert isinstance(command, JoinQuery)
+    assert command.steps[0].conditions[0].left == "person_id"
+    assert command.steps[0].conditions[0].right == "researcher_id"
+
+
+def test_parse_explain() -> None:
+    command = parse("EXPLAIN FIND person_id FROM faculty WHERE title IN (Professor, Lecturer)")
+    assert isinstance(command, ExplainCommand)
+    assert isinstance(command.command, FindQuery)
 
 
 def test_parse_save() -> None:
@@ -48,4 +65,3 @@ def test_split_script_respects_save_parentheses() -> None:
 def test_invalid_find_raises() -> None:
     with pytest.raises(AQLSyntaxError):
         parse("FIND FROM faculty")
-
